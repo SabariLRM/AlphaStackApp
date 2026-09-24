@@ -14,7 +14,7 @@ docker compose up -d
 | Registration portal (phone + OTP only) | http://localhost:8089 |
 | Inbound SMTP server (MX) | `localhost:2525` |
 | Mailpit — catches mail sent to external addresses | http://localhost:8025 |
-| Dev SMS outbox — OTPs & SMS alerts when no SMS provider is configured | http://localhost:8088/api/dev/sms/view |
+| **Local phone** — call the toll-free number, text it, read the SMS PhoneMail sends you (OTPs, alerts) | http://localhost:8088/api/dev/phone |
 | Android app | [`releases/PhoneMail.apk`](releases/PhoneMail.apk) (also served at http://localhost:8088/downloads/PhoneMail.apk) |
 
 ---
@@ -120,22 +120,26 @@ cd AlphaStackApp
 docker compose up -d
 ```
 
-Everything has working defaults — no `.env` needed. Without an SMS provider, SMS are not sent; they appear in the **dev SMS outbox** (http://localhost:8088/api/dev/sms/view), which is where you read OTP codes. To change ports or plug in Twilio, copy `.env.example` to `.env` (see [Configuration](#configuration)).
+**Everything runs locally** with the defaults — no accounts, no `.env`, no internet services:
+
+- **Mail** — users email each other through PhoneMail; mail “from the outside” enters through the built-in SMTP server (`localhost:2525`), and mail to outside addresses is caught by Mailpit (http://localhost:8025).
+- **SMS, calls and OTPs** — nothing is sent to a real phone. The **local phone** (http://localhost:8088/api/dev/phone) stands in for one: enter your number, *call* the toll-free number and press 1 (the prompts are spoken by your browser), *text* JOIN to the SMS number, and read every SMS PhoneMail sends you — sign-in codes, welcome texts and “You have received an email from …” alerts.
+
+Twilio and SMSGate are optional extras for real phones (see [SMS, OTP and IVR](#sms-otp-and-ivr)).
 
 ### Try it
 
-1. **Register on the portal** — http://localhost:8089, enter `98765 43210`, tap *Get OTP*, read the code in the SMS outbox, enter it. You get `9876543210@phonemail.com` and the form resets.
+1. **Register on the portal** — http://localhost:8089, enter `98765 43210`, tap *Get OTP*, read the code on the local phone (number `+91 98765 43210`), enter it. You get `9876543210@phonemail.com` and the form resets.
 2. **Sign in to the web client** — http://localhost:8088 with another number (it is created automatically), compose an email to `9876543210`.
 3. **Receive mail from “outside”** through the SMTP server:
    ```bash
    python3 scripts/send-test-email.py 9876543210 --from "Priya <priya@example.org>" --subject "Quarterly numbers" --html
    ```
    `9876543210` has no app session, so an SMS alert shows up in the outbox.
-4. **IVR / SMS sign-up without a phone** (signature checks are off while no Twilio token is set):
+4. **Toll-free call / SMS sign-up** — on the local phone, change the number, tap *Call PhoneMail* and press **1**, or text **JOIN**. The same works from a terminal:
    ```bash
    scripts/simulate-twilio.sh call +919000011111   # “press 1”
    scripts/simulate-twilio.sh sms  +919000022222   # text JOIN
-   scripts/simulate-twilio.sh gate +919000033333   # text JOIN to an SMSGate phone
    ```
 5. **Send to an external address** (e.g. `someone@gmail.com`) and open Mailpit at http://localhost:8025.
 6. **Android**: install the APK on an emulator — it talks to `http://10.0.2.2:8088` out of the box.
@@ -144,11 +148,10 @@ Everything has working defaults — no `.env` needed. Without an SMS provider, S
 
 Download [`releases/PhoneMail.apk`](releases/PhoneMail.apk) (Android 8.0+, signed with a debug key so it installs without a keystore).
 
-- **Emulator**: install and open; the default server is `http://10.0.2.2:8088` (the host's docker compose). To see OTP auto-detection, request a code and deliver it as an SMS to the emulator:
+- **Emulator**: install and open; the default server is `http://10.0.2.2:8088` (the host's docker compose). The emulator's SIM number is detected automatically. Read the code on the local phone, or deliver it to the emulator as a real SMS to watch it being filled in and verified automatically:
   ```bash
   adb emu sms send 12345 "Your PhoneMail code is 123456"
   ```
-  (use the code from the dev SMS outbox; with a real SMS provider it arrives by itself).
 - **Real phone on the same Wi-Fi**: on the first screen tap the server icon (top-right) — or *Settings → Server settings* later — and enter `http://<your-computer-LAN-IP>:8088`.
 - **Build it yourself** (JDK 17, Android SDK 35):
   ```bash
@@ -285,7 +288,7 @@ All endpoints are under `/api` (proxied by nginx). Web sessions use an `httpOnly
 | Realtime | `GET /ws` (WebSocket: `entry.created`, `entries.updated`, `conversation.updated`, `drafts.updated`, `profile.updated`) |
 | Twilio | `POST /twilio/voice`, `POST /twilio/voice/menu`, `POST /twilio/sms` |
 | SMSGate | `POST /smsgate/webhook` (signed incoming-SMS webhook) |
-| Misc | `GET /config`, `GET /health`, `GET /dev/sms[/view]` (console provider only) |
+| Misc | `GET /config`, `GET /health`, `GET /dev/phone`, `GET /dev/sms[/view]` (local mode only) |
 
 ## Security
 
@@ -304,7 +307,7 @@ All endpoints are under `/api` (proxied by nginx). Web sessions use an `httpOnly
 ```bash
 # Backend (needs a Postgres; tests use TEST_DATABASE_URL, default postgres://test:test@localhost:55432/phonemail_test)
 docker run -d --name phonemail-testdb -e POSTGRES_USER=test -e POSTGRES_PASSWORD=test -e POSTGRES_DB=phonemail_test -p 55432:5432 postgres:16-alpine
-cd backend && npm ci && npm test          # 48 integration + unit tests
+cd backend && npm ci && npm test          # 50 integration + unit tests
 npm run dev                               # API on :3000 (DATABASE_URL=...)
 
 cd mailserver && go test ./...            # SMTP session + MIME parsing tests
@@ -327,11 +330,12 @@ releases/    Built APK
 scripts/     send-test-email.py, simulate-twilio.sh, tunnel-url.sh, twilio-call-me.sh, smsgate-webhook.sh
 ```
 
-## Everything is free
+## Everything is local and free
 
-| Piece | Free option |
+| Piece | Local, free option |
 | --- | --- |
 | Hosting | `docker compose up -d` on your own machine |
+| Calls, SMS and OTPs | The local phone at http://localhost:8088/api/dev/phone (default) |
 | Public HTTPS URL for webhooks | Cloudflare quick tunnel (`--profile tunnel`, no account) |
 | Toll-free number + IVR + SMS | Twilio free trial (trial credit; verified numbers only). Test the IVR with `scripts/twilio-call-me.sh` so you receive the call instead of paying for an international one. |
 | OTP and new-mail SMS | Dev outbox, Twilio trial (Verify template for India), or SMSGate on your own phone |
