@@ -1,0 +1,22 @@
+.env
+.DS_Store
+node_modules/
+dist/
+/backend/data/
+*.log
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/.kotlin/
+android/*.iml
+android/captures/
+android/app/release/
+*.keystore
+*.tsbuildinfo
+
+# Go build output
+mailserver/mailserver
