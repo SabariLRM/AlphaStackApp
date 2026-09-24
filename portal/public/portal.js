@@ -150,6 +150,7 @@ call('/config')
     $('dev').hidden = !cfg.devSmsOutbox;
     if (cfg.webUrl) {
       $('web-link').href = cfg.webUrl;
+      $('phone-link').href = `${cfg.webUrl}/api/dev/phone`;
       $('apk-link').href = `${cfg.webUrl}/downloads/PhoneMail.apk`;
     }
     if (cfg.defaultCallingCode && cfg.defaultCallingCode !== '91') {

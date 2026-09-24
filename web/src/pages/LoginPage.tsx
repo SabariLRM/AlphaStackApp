@@ -172,7 +172,8 @@ export function LoginPage() {
 
           {config?.devSmsOutbox && (
             <div className="dev-note">
-              Developer mode: SMS are not really sent. Open the <a href="/api/dev/sms/view" target="_blank" rel="noreferrer">SMS outbox</a> to see your code.
+              Everything runs locally: SMS are not really sent. Open the <a href="/api/dev/phone" target="_blank" rel="noreferrer">local phone</a> to see your code (or
+              call and text PhoneMail from it).
             </div>
           )}
         </form>
