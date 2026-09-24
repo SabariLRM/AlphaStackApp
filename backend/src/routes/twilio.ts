@@ -75,7 +75,7 @@ export async function twilioRoutes(app: FastifyInstance, ctx: AppContext) {
     `</Gather>` +
     say('We did not receive any input. Goodbye!');
 
-  // Incoming call on the toll-free number.
+  // Incoming call on the toll-free number (or the start of a "call me" call).
   app.post('/api/twilio/voice', { config: { rateLimit: false } }, async (req, reply) => {
     verify(req);
     return twiml(reply, menu());
@@ -85,7 +85,9 @@ export async function twilioRoutes(app: FastifyInstance, ctx: AppContext) {
     verify(req);
     const p = params(req);
     const digit = (p.Digits ?? '').trim();
-    const phone = normalizePhone(p.From ?? '', ctx.config.defaultCountry);
+    // Inbound calls come *from* the user; "call me" calls (Twilio dialing the user, free for them) go *to* the user.
+    const caller = (p.Direction ?? '').startsWith('outbound') ? p.To : p.From;
+    const phone = normalizePhone(caller ?? '', ctx.config.defaultCountry);
 
     if (digit !== '1' && digit !== '2') {
       return twiml(reply, say('Sorry, that is not a valid option.') + `<Redirect method="POST">/api/twilio/voice</Redirect>`);
