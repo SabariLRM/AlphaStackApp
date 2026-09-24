@@ -1,0 +1,114 @@
+# PhoneMail — `docker compose up -d` starts everything.
+#
+#   Web client ........... http://localhost:8088
+#   Registration portal .. http://localhost:8089
+#   SMTP (inbound MX) .... localhost:2525
+#   Mailpit (outbound) ... http://localhost:8025
+#
+# Settings are read from .env (see .env.example). Every value has a working default.
+name: phonemail
+
+x-common-env: &common-env
+  MAIL_DOMAIN: ${MAIL_DOMAIN:-phonemail.com}
+  INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-change-me-internal-token}
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: phonemail
+      POSTGRES_USER: phonemail
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-phonemail}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U phonemail -d phonemail"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgres://phonemail:${POSTGRES_PASSWORD:-phonemail}@db:5432/phonemail
+      APP_SECRET: ${APP_SECRET:-change-me-to-a-long-random-string}
+      DEFAULT_COUNTRY: ${DEFAULT_COUNTRY:-IN}
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:8088}
+      PUBLIC_PORTAL_URL: ${PUBLIC_PORTAL_URL:-http://localhost:8089}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      SMS_PROVIDER: ${SMS_PROVIDER:-console}
+      OTP_PROVIDER: ${OTP_PROVIDER:-local}
+      DEV_SMS_OUTBOX: ${DEV_SMS_OUTBOX:-true}
+      SMS_NOTIFY_MAX_PER_HOUR: ${SMS_NOTIFY_MAX_PER_HOUR:-10}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM_NUMBER: ${TWILIO_FROM_NUMBER:-}
+      TWILIO_MESSAGING_SERVICE_SID: ${TWILIO_MESSAGING_SERVICE_SID:-}
+      TWILIO_VERIFY_SERVICE_SID: ${TWILIO_VERIFY_SERVICE_SID:-}
+      TWILIO_WEBHOOK_BASE_URL: ${TWILIO_WEBHOOK_BASE_URL:-}
+      TWILIO_VALIDATE_WEBHOOKS: ${TWILIO_VALIDATE_WEBHOOKS:-true}
+      IVR_VOICE: ${IVR_VOICE:-Polly.Aditi}
+      IVR_LANGUAGE: ${IVR_LANGUAGE:-en-IN}
+      SMSGATE_URL: ${SMSGATE_URL:-https://api.sms-gate.app/3rdparty/v1}
+      SMSGATE_USERNAME: ${SMSGATE_USERNAME:-}
+      SMSGATE_PASSWORD: ${SMSGATE_PASSWORD:-}
+      TEXTBELT_KEY: ${TEXTBELT_KEY:-textbelt}
+      FAST2SMS_API_KEY: ${FAST2SMS_API_KEY:-}
+      SMTP_RELAY_URL: ${SMTP_RELAY_URL-smtp://mailpit:1025}
+    volumes:
+      - maildata:/data
+    expose:
+      - "3000"
+
+  mailserver:
+    build: ./mailserver
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+      API_URL: http://api:3000
+      SMTP_LISTEN: ":2525"
+      SMTP_HOSTNAME: ${SMTP_HOSTNAME:-mx.phonemail.com}
+    ports:
+      - "${SMTP_PORT:-2525}:2525"
+
+  web:
+    build: ./web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${WEB_PORT:-8088}:80"
+    volumes:
+      - ./releases:/usr/share/nginx/downloads:ro
+
+  portal:
+    build: ./portal
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${PORTAL_PORT:-8089}:80"
+
+  # Catches mail sent to non-PhoneMail addresses (gmail.com etc.) so you can inspect it locally.
+  # Point SMTP_RELAY_URL at a real relay (e.g. smtps://user:pass@smtp-relay.brevo.com:465) to deliver for real.
+  mailpit:
+    image: axllent/mailpit:v1.31
+    restart: unless-stopped
+    ports:
+      - "${MAILPIT_PORT:-8025}:8025"
+
+volumes:
+  pgdata:
+  maildata:
