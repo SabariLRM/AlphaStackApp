@@ -144,3 +144,30 @@ describe('registration portal', () => {
     expect(reg.json().token).toBeUndefined();
   });
 });
+
+describe('local phone (dev mode)', () => {
+  it('serves the local phone and filters the SMS outbox by number', async () => {
+    const page = await h.app.inject({ method: 'GET', url: '/api/dev/phone' });
+    expect(page.statusCode).toBe(200);
+    expect(page.headers['content-type']).toContain('text/html');
+    expect(page.body).toContain('/api/dev/phone.js');
+    const js = await h.app.inject({ method: 'GET', url: '/api/dev/phone.js' });
+    expect(js.headers['content-type']).toContain('javascript');
+
+    await h.app.inject({ method: 'POST', url: '/api/auth/otp/request', payload: { phone: '9111122222' } });
+    const mine = (await h.app.inject({ method: 'GET', url: '/api/dev/sms?phone=' + encodeURIComponent('+91 91111 22222') })).json().items;
+    expect(mine.length).toBeGreaterThan(0);
+    expect(mine.every((m: { to: string }) => m.to === '+919111122222')).toBe(true);
+    expect((await h.app.inject({ method: 'GET', url: '/api/dev/sms?phone=abc' })).json().items).toEqual([]);
+  });
+
+  it('is not available with a real SMS provider', async () => {
+    const real = await createHarness({ SMS_PROVIDER: 'smsgate', SMSGATE_USERNAME: 'u', SMSGATE_PASSWORD: 'p' });
+    try {
+      expect((await real.app.inject({ method: 'GET', url: '/api/dev/phone' })).statusCode).toBe(404);
+      expect((await real.app.inject({ method: 'GET', url: '/api/dev/sms' })).statusCode).toBe(404);
+    } finally {
+      await real.close();
+    }
+  });
+});

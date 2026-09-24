@@ -1,7 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import type { AppContext } from '../context.js';
 import { many } from '../db/pool.js';
+import { z } from 'zod';
 import { notFound } from '../lib/errors.js';
+import { normalizePhone } from '../lib/phone.js';
+import { devPhoneHtml, devPhoneJs } from './devPhone.js';
 
 const esc = (s: string) => s.replace(/[<>&"']/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' })[c]!);
 
@@ -10,15 +13,23 @@ const esc = (s: string) => s.replace(/[<>&"']/g, (c) => ({ '<': '&lt;', '>': '&g
  * notifications are shown here instead. Disabled automatically with any real provider.
  */
 export async function devRoutes(app: FastifyInstance, ctx: AppContext) {
-  const recent = () =>
+  const recent = (phone?: string) =>
     many<{ id: number; to_phone: string; body: string; purpose: string; status: string; created_at: Date }>(
       ctx.db,
-      'SELECT id, to_phone, body, purpose, status, created_at FROM sms_log ORDER BY id DESC LIMIT 100',
+      `SELECT id, to_phone, body, purpose, status, created_at FROM sms_log
+        WHERE ($1::text IS NULL OR to_phone = $1) ORDER BY id DESC LIMIT 100`,
+      [phone ?? null],
     );
 
-  app.get('/api/dev/sms', async () => {
+  app.get('/api/dev/sms', async (req) => {
     if (!ctx.config.sms.devOutbox) throw notFound();
-    const rows = await recent();
+    const { phone } = z.object({ phone: z.string().max(40).optional() }).parse(req.query);
+    let e164: string | undefined;
+    if (phone) {
+      e164 = normalizePhone(phone, ctx.config.defaultCountry)?.e164;
+      if (!e164) return { items: [] };
+    }
+    const rows = await recent(e164);
     return { items: rows.map((r) => ({ id: r.id, to: r.to_phone, body: r.body, purpose: r.purpose, status: r.status, createdAt: r.created_at.toISOString() })) };
   });
 
@@ -41,7 +52,20 @@ ul{list-style:none;margin:0 auto;padding:16px;max-width:720px}li{background:#fff
 li.otp{border-left:4px solid #25d366}li.notification{border-left:4px solid #53bdeb}li.welcome{border-left:4px solid #ffb300}
 .meta{display:flex;gap:10px;align-items:baseline;font-size:12px;color:#667781}.meta b{color:#111b21;font-size:14px}.meta time{margin-left:auto}
 p{margin:6px 0 0;white-space:pre-wrap}.empty{text-align:center;color:#667781;padding:40px}
-</style></head><body><header><h1>Dev SMS outbox</h1><p>SMS_PROVIDER=console — messages are not sent; they appear here (auto-refreshes).</p></header>
+</style></head><body><header><h1>Dev SMS outbox</h1><p>SMS_PROVIDER=console — messages are not sent; they appear here (auto-refreshes). Want to call or text PhoneMail? Open the <a href="/api/dev/phone" style="color:#fff">local phone</a>.</p></header>
 <ul>${items || '<li class="empty">No messages yet. Request an OTP to see it here.</li>'}</ul></body></html>`;
+  });
+
+  // Local phone: call the IVR, text the SMS number and read the SMS sent to your number.
+  app.get('/api/dev/phone', async (_req, reply) => {
+    if (!ctx.config.sms.devOutbox) throw notFound();
+    reply.type('text/html; charset=utf-8');
+    return devPhoneHtml;
+  });
+
+  app.get('/api/dev/phone.js', async (_req, reply) => {
+    if (!ctx.config.sms.devOutbox) throw notFound();
+    reply.type('application/javascript; charset=utf-8');
+    return devPhoneJs;
   });
 }
