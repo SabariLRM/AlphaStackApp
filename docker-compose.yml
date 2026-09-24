@@ -59,8 +59,7 @@ services:
       SMSGATE_URL: ${SMSGATE_URL:-https://api.sms-gate.app/3rdparty/v1}
       SMSGATE_USERNAME: ${SMSGATE_USERNAME:-}
       SMSGATE_PASSWORD: ${SMSGATE_PASSWORD:-}
-      TEXTBELT_KEY: ${TEXTBELT_KEY:-textbelt}
-      FAST2SMS_API_KEY: ${FAST2SMS_API_KEY:-}
+      SMSGATE_SIGNING_KEY: ${SMSGATE_SIGNING_KEY:-}
       SMTP_RELAY_URL: ${SMTP_RELAY_URL-smtp://mailpit:1025}
     volumes:
       - maildata:/data
@@ -102,12 +101,21 @@ services:
       - "${PORTAL_PORT:-8089}:80"
 
   # Catches mail sent to non-PhoneMail addresses (gmail.com etc.) so you can inspect it locally.
-  # Point SMTP_RELAY_URL at a real relay (e.g. smtps://user:pass@smtp-relay.brevo.com:465) to deliver for real.
   mailpit:
     image: axllent/mailpit:v1.31
     restart: unless-stopped
     ports:
       - "${MAILPIT_PORT:-8025}:8025"
+
+  # Optional free public HTTPS URL for Twilio/SMSGate webhooks (Cloudflare quick tunnel, no account needed):
+  #   docker compose --profile tunnel up -d && scripts/tunnel-url.sh
+  tunnel:
+    image: cloudflare/cloudflared:2026.9.1
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --url http://web:80
+    depends_on:
+      - web
 
 volumes:
   pgdata:
