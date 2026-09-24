@@ -32,7 +32,7 @@ const str = (fallback = '') =>
 
 const emptyToUndefined = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? undefined : typeof v === 'string' ? v.trim() : v);
 
-export const SMS_PROVIDERS = ['console', 'twilio', 'twilio_verify', 'smsgate', 'textbelt', 'fast2sms'] as const;
+export const SMS_PROVIDERS = ['console', 'twilio', 'twilio_verify', 'smsgate'] as const;
 export const OTP_PROVIDERS = ['local', 'twilio_verify'] as const;
 
 const schema = z.object({
@@ -75,9 +75,7 @@ const schema = z.object({
   SMSGATE_URL: str('https://api.sms-gate.app/3rdparty/v1'),
   SMSGATE_USERNAME: str(),
   SMSGATE_PASSWORD: str(),
-  TEXTBELT_URL: str('https://textbelt.com/text'),
-  TEXTBELT_KEY: str('textbelt'),
-  FAST2SMS_API_KEY: str(),
+  SMSGATE_SIGNING_KEY: str(),
 
   SMTP_RELAY_URL: str(''),
   MAX_ATTACHMENT_BYTES: int(25 * 1024 * 1024),
@@ -120,9 +118,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
   }
   if (c.SMS_PROVIDER === 'smsgate' && (!c.SMSGATE_USERNAME || !c.SMSGATE_PASSWORD)) {
     throw new Error('SMSGATE_USERNAME and SMSGATE_PASSWORD are required when SMS_PROVIDER=smsgate.');
-  }
-  if (c.SMS_PROVIDER === 'fast2sms' && !c.FAST2SMS_API_KEY) {
-    throw new Error('FAST2SMS_API_KEY is required when SMS_PROVIDER=fast2sms.');
   }
   if (c.OTP_PROVIDER === 'local' && c.SMS_PROVIDER === 'twilio_verify') {
     throw new Error('OTP_PROVIDER=local needs an SMS provider that can send custom text. Use OTP_PROVIDER=twilio_verify together with SMS_PROVIDER=twilio_verify.');
@@ -174,9 +169,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       ivrVoice: c.IVR_VOICE,
       ivrLanguage: c.IVR_LANGUAGE,
     },
-    smsgate: { url: c.SMSGATE_URL.replace(/\/+$/, ''), username: c.SMSGATE_USERNAME, password: c.SMSGATE_PASSWORD },
-    textbelt: { url: c.TEXTBELT_URL, key: c.TEXTBELT_KEY },
-    fast2sms: { apiKey: c.FAST2SMS_API_KEY },
+    smsgate: { url: c.SMSGATE_URL.replace(/\/+$/, ''), username: c.SMSGATE_USERNAME, password: c.SMSGATE_PASSWORD, signingKey: c.SMSGATE_SIGNING_KEY },
     smtpRelayUrl: c.SMTP_RELAY_URL,
     maxAttachmentBytes: c.MAX_ATTACHMENT_BYTES,
     maxAvatarBytes: c.MAX_AVATAR_BYTES,

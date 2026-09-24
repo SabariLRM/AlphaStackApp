@@ -91,43 +91,6 @@ export class SmsGateProvider implements SmsProvider {
   }
 }
 
-/** Textbelt: the public "textbelt" key allows one free SMS per day; paid keys are cheap. */
-export class TextbeltProvider implements SmsProvider {
-  readonly name = 'textbelt';
-  readonly supportsCustomText = true;
-  constructor(private readonly cfg: Config['textbelt']) {}
-  async send(to: string, body: string): Promise<SmsSendResult> {
-    const res = await fetch(this.cfg.url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone: to, message: body, key: this.cfg.key }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-    const json = await readJson(res);
-    if (!res.ok || json.success !== true) throw new Error(`Textbelt error: ${String(json.error ?? json.raw ?? res.status)}`);
-    return { id: json.textId !== undefined ? String(json.textId) : undefined };
-  }
-}
-
-/** Fast2SMS (India): low-cost "Quick SMS" route supports free-form text to Indian numbers. */
-export class Fast2SmsProvider implements SmsProvider {
-  readonly name = 'fast2sms';
-  readonly supportsCustomText = true;
-  constructor(private readonly cfg: Config['fast2sms']) {}
-  async send(to: string, body: string): Promise<SmsSendResult> {
-    if (!to.startsWith('+91')) throw new Error('Fast2SMS can only deliver to Indian (+91) numbers.');
-    const res = await fetch('https://www.fast2sms.com/dev/bulkV2', {
-      method: 'POST',
-      headers: { authorization: this.cfg.apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ route: 'q', message: body, language: 'english', flash: 0, numbers: to.slice(3) }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-    const json = await readJson(res);
-    if (!res.ok || json.return !== true) throw new Error(`Fast2SMS error: ${JSON.stringify(json.message ?? json.raw ?? res.status)}`);
-    return { id: json.request_id !== undefined ? String(json.request_id) : undefined };
-  }
-}
-
 export async function twilioStartVerification(cfg: Config['twilio'], to: string, appHash?: string): Promise<{ sid?: string }> {
   const form = new URLSearchParams({ To: to, Channel: 'sms' });
   if (appHash) form.set('AppHash', appHash);
@@ -164,10 +127,6 @@ export function createSmsProvider(config: Config, log: Logger): SmsProvider {
       return new TwilioVerifyTemplateProvider(config.twilio);
     case 'smsgate':
       return new SmsGateProvider(config.smsgate);
-    case 'textbelt':
-      return new TextbeltProvider(config.textbelt);
-    case 'fast2sms':
-      return new Fast2SmsProvider(config.fast2sms);
     case 'console':
     default:
       return new ConsoleSmsProvider(log);

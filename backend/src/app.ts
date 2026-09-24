@@ -21,13 +21,14 @@ import { meRoutes } from './routes/me.js';
 import { messageRoutes } from './routes/messages.js';
 import { metaRoutes } from './routes/meta.js';
 import { portalRoutes } from './routes/portal.js';
+import { smsgateRoutes } from './routes/smsgate.js';
 import { twilioRoutes } from './routes/twilio.js';
 import { wsRoutes } from './routes/ws.js';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 // Endpoints that never act on a signed-in user: a session cookie sent along (browsers share
 // cookies between localhost ports) must not trigger the CSRF check there.
-const PUBLIC_PREFIXES = ['/api/portal/', '/api/auth/otp/', '/api/twilio/', '/api/config', '/api/health'];
+const PUBLIC_PREFIXES = ['/api/portal/', '/api/auth/otp/', '/api/twilio/', '/api/smsgate/', '/api/config', '/api/health'];
 
 export async function buildApp(ctx: AppContext, opts: { logger?: boolean } = {}): Promise<FastifyInstance> {
   const app = Fastify({
@@ -102,6 +103,7 @@ export async function buildApp(ctx: AppContext, opts: { logger?: boolean } = {})
     await attachmentRoutes(api, ctx);
     await contactRoutes(api, ctx);
     await twilioRoutes(api, ctx);
+    await smsgateRoutes(api, ctx);
     await devRoutes(api, ctx);
     await wsRoutes(api, ctx);
   });
