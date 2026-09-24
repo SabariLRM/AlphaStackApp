@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- PhoneMail servers are often self-hosted on a laptop or LAN (http://10.0.2.2:8088, http://192.168.x.x:8088),
+     so plain HTTP is allowed. Use HTTPS for any public deployment. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
