@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { smsgateSignature } from '../src/routes/smsgate.js';
 import { twilioSignature } from '../src/routes/twilio.js';
 import { api, createHarness, INTERNAL_TOKEN, login, type Harness } from './helpers.js';
 
@@ -158,5 +159,69 @@ describe('Twilio webhook signatures', () => {
       headers: { 'content-type': 'application/x-www-form-urlencoded', 'x-twilio-signature': 'nope' },
     });
     expect(bad.statusCode).toBe(403);
+  });
+});
+
+describe('Twilio "call me" (outbound) IVR', () => {
+  it('creates the account for the number Twilio called', async () => {
+    const res = await h.app.inject({
+      method: 'POST',
+      url: '/api/twilio/voice/menu',
+      payload: 'From=%2B15005550006&To=%2B919888877777&Direction=outbound-api&Digits=1',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    });
+    expect(res.body).toContain('9 8 8 8 8 7 7 7 7 7');
+    const { user } = await login(h, '9888877777', 'web');
+    expect(user.registrationSource).toBe('ivr');
+  });
+});
+
+describe('SMSGate free SMS sign-up', () => {
+  let g: Harness;
+  const key = 'gate-signing-key';
+  beforeAll(async () => {
+    g = await createHarness({ SMS_PROVIDER: 'smsgate', SMSGATE_USERNAME: 'u', SMSGATE_PASSWORD: 'p', SMSGATE_SIGNING_KEY: key });
+  });
+  afterAll(async () => g.close());
+
+  const post = (payload: object, opts: { sign?: boolean; ts?: number } = {}) => {
+    const body = JSON.stringify(payload);
+    const ts = String(opts.ts ?? Math.floor(Date.now() / 1000));
+    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    if (opts.sign !== false) {
+      headers['x-timestamp'] = ts;
+      headers['x-signature'] = smsgateSignature(key, body, ts);
+    }
+    return g.app.inject({ method: 'POST', url: '/api/smsgate/webhook', payload: body, headers });
+  };
+  const sms = (sender: string, message: string) => ({ event: 'sms:received', payload: { message, sender, receivedAt: new Date().toISOString() } });
+
+  it('creates an account when someone texts JOIN and replies through the gateway', async () => {
+    const res = await post(sms('+919777700001', 'join'));
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ action: 'created', address: '9777700001@phonemail.com' });
+    await g.runJobs();
+    expect(g.sms.sent.some((m) => m.to === '+919777700001' && m.body.includes('9777700001@phonemail.com'))).toBe(true);
+    // Local-format senders work too, and a second JOIN just reports the existing account.
+    expect((await post(sms('9777700001', 'JOIN please'))).json().action).toBe('exists');
+  });
+
+  it('ignores ordinary texts, other events and alphanumeric senders', async () => {
+    expect((await post(sms('+919777700002', 'hey, are we meeting today?'))).json().ignored).toBe('text');
+    expect((await post(sms('VM-BANKIN', 'JOIN'))).json().ignored).toBe('sender');
+    expect((await post({ event: 'sms:sent', payload: { message: 'x' } })).json().ignored).toBe('event');
+  });
+
+  it('rejects unsigned, forged or stale webhooks', async () => {
+    expect((await post(sms('+919777700003', 'JOIN'), { sign: false })).statusCode).toBe(403);
+    expect((await post(sms('+919777700003', 'JOIN'), { ts: Math.floor(Date.now() / 1000) - 3600 })).statusCode).toBe(403);
+    const body = JSON.stringify(sms('+919777700003', 'JOIN'));
+    const forged = await g.app.inject({
+      method: 'POST',
+      url: '/api/smsgate/webhook',
+      payload: body,
+      headers: { 'content-type': 'application/json', 'x-timestamp': String(Math.floor(Date.now() / 1000)), 'x-signature': 'deadbeef' },
+    });
+    expect(forged.statusCode).toBe(403);
   });
 });
