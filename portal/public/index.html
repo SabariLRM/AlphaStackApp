@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Create your free PhoneMail address with just your phone number." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="/portal.css" />
+    <title>PhoneMail · Create account</title>
+  </head>
+  <body>
+    <main class="wrap">
+      <section class="card" aria-labelledby="title">
+        <header class="head">
+          <img src="/favicon.svg" alt="" width="56" height="56" />
+          <div>
+            <h1 id="title">Create a PhoneMail account</h1>
+            <p>Your phone number becomes your email address.</p>
+          </div>
+        </header>
+
+        <div id="success" class="success" role="status" aria-live="polite" hidden>
+          <span class="check" aria-hidden="true">✓</span>
+          <div>
+            <strong>Account created!</strong>
+            <div class="addr"><span id="success-address"></span> <button type="button" id="copy" class="link">Copy</button></div>
+            <small>Ready for the next account.</small>
+          </div>
+        </div>
+
+        <form id="form" novalidate autocomplete="off">
+          <label for="phone">Phone number</label>
+          <div class="input-wrap">
+            <input id="phone" name="phone" type="tel" inputmode="tel" placeholder="98765 43210" maxlength="24" required autofocus />
+          </div>
+          <p class="hint" id="phone-hint">Indian numbers can be typed without +91. Use + and the country code for other countries.</p>
+
+          <label for="otp">OTP</label>
+          <div class="input-wrap">
+            <input id="otp" name="otp" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="Tap “Get OTP” first" maxlength="8" disabled />
+          </div>
+          <div class="links" id="otp-links" hidden>
+            <button type="button" class="link" id="change">Change number</button>
+            <button type="button" class="link" id="resend" disabled>Resend OTP</button>
+          </div>
+
+          <p id="error" class="error" role="alert" hidden></p>
+          <button id="submit" class="primary" type="submit">Get OTP</button>
+        </form>
+
+        <p id="dev" class="dev" hidden>Developer mode: SMS are not really sent — see the <a href="/api/dev/sms/view" target="_blank" rel="noopener">SMS outbox</a> for OTPs.</p>
+      </section>
+      <footer>
+        This portal only creates accounts. To read your mail, use the <a id="web-link" href="http://localhost:8088">web client</a> or the
+        <a id="apk-link" href="http://localhost:8088/downloads/PhoneMail.apk">Android app</a>.
+      </footer>
+    </main>
+    <script type="module" src="/portal.js"></script>
+  </body>
+</html>
