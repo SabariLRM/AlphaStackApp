@@ -41,7 +41,7 @@ docker compose up -d
 | Method | How |
 | --- | --- |
 | **Toll-free number (IVR)** | Call the Twilio number → *“To create your PhoneMail account, press 1”* → the account is created for the caller ID and the address is read out (and texted). Press **2** to hear your address. |
-| **SMS** | Text anything (e.g. `JOIN`) to the Twilio number → the reply contains your new address. `HELP` explains; opt-out keywords are left to Twilio. |
+| **SMS** | Text anything (e.g. `JOIN`) to the Twilio number → the reply contains your new address. `HELP` explains; opt-out keywords are left to Twilio. For free, text `JOIN` to an ordinary Indian number running the SMSGate app instead (see below). |
 | **Registration portal** | http://localhost:8089 — exactly two fields, *Phone number* and *OTP*. After an account is created the form resets for the next one. It can only reach the registration endpoints. |
 | **Web client** | One screen: phone number, OTP, one **Next** button, and *“By signing up, you agree to the Terms of Service”* (linked). New numbers are signed up automatically. |
 | **Android app** | Language → Terms → phone number (detected from the SIM and pre-filled, editable) → OTP (read from the SMS automatically and verified without a tap) → inbox. |
@@ -93,7 +93,7 @@ flowchart LR
     DB[(PostgreSQL)]
     MP[Mailpit<br/>outbound catcher]
   end
-  SMS[SMS provider<br/>console · Twilio · Verify · SMSGate · Textbelt · Fast2SMS]
+  SMS[SMS provider<br/>console · Twilio trial · Verify · SMSGate]
 
   A -- REST + WebSocket --> NW
   W --> NW --> API
@@ -135,6 +135,7 @@ Everything has working defaults — no `.env` needed. Without an SMS provider, S
    ```bash
    scripts/simulate-twilio.sh call +919000011111   # “press 1”
    scripts/simulate-twilio.sh sms  +919000022222   # text JOIN
+   scripts/simulate-twilio.sh gate +919000033333   # text JOIN to an SMSGate phone
    ```
 5. **Send to an external address** (e.g. `someone@gmail.com`) and open Mailpit at http://localhost:8025.
 6. **Android**: install the APK on an emulator — it talks to `http://10.0.2.2:8088` out of the box.
@@ -165,34 +166,42 @@ Background notifications: while the app process is alive, new mail arrives insta
 | `SMS_PROVIDER` | Cost | Custom text | Notes |
 | --- | --- | --- | --- |
 | `console` *(default)* | free | yes | Nothing leaves the server; see the dev SMS outbox. |
-| `twilio` | free trial credit | yes* | Programmable Messaging from your Twilio number. Trial accounts can only text verified numbers; *some countries (e.g. India) block unregistered custom text on trial.* |
+| `twilio` | free trial credit | yes* | Programmable Messaging from your Twilio trial number. Trial accounts can only text verified numbers; *some countries (e.g. India) block unregistered custom text on trial.* |
 | `twilio_verify` | free trial credit | template only | Uses Twilio Verify's pre-approved template as the “you have mail” ping, as the buildathon clarification allows. Requires `OTP_PROVIDER=twilio_verify`. Welcome texts are skipped. |
-| `smsgate` | **free** | yes | [SMSGate](https://sms-gate.app): install the open-source app on any Android phone and it sends the SMS from its SIM — full custom text (the notification wording above), including to Indian numbers. |
-| `textbelt` | 1 free/day, then cheap | yes | [textbelt.com](https://textbelt.com). |
-| `fast2sms` | low cost (India) | yes | [Fast2SMS](https://www.fast2sms.com) Quick SMS route. |
+| `smsgate` | **free** | yes | [SMSGate](https://sms-gate.app): the open-source app on any Android phone sends the SMS from its SIM — full custom text (the notification wording above), including to Indian numbers, within your SIM's free SMS pack. Texting `JOIN` to that phone also creates an account. |
+
+Only free options are supported: paid gateways were deliberately left out.
 
 | `OTP_PROVIDER` | |
 | --- | --- |
 | `local` *(default)* | PhoneMail generates the code and sends it through `SMS_PROVIDER`. The message ends with the Android app hash so the SMS Retriever API can read it. |
 | `twilio_verify` | Twilio Verify sends and checks the code (app hash passed as `AppHash`). |
 
-### Setting up the Twilio trial (toll-free IVR + SMS)
+### Free public URL (for Twilio and SMSGate webhooks)
 
-1. Create a free Twilio account, verify your own phone number, and get a trial phone number (toll-free where available).
-2. Expose PhoneMail publicly, e.g. `ngrok http 8088`, and set `TWILIO_WEBHOOK_BASE_URL=https://<id>.ngrok-free.app`.
-3. In the Twilio console, configure the number:
-   - **A call comes in** → Webhook → `POST https://<id>.ngrok-free.app/api/twilio/voice`
-   - **A message comes in** → Webhook → `POST https://<id>.ngrok-free.app/api/twilio/sms`
-4. `.env` (pick one of the SMS setups):
+Twilio and SMSGate need to reach your machine over HTTPS. The compose file includes a **Cloudflare quick tunnel** — free, no account:
+
+```bash
+docker compose --profile tunnel up -d
+scripts/tunnel-url.sh          # → https://<random-words>.trycloudflare.com
+```
+
+The URL changes whenever the tunnel restarts; update the Twilio/SMSGate webhooks when it does. Twilio signatures are validated against the tunnel's public URL automatically (or set `TWILIO_WEBHOOK_BASE_URL`).
+
+### Setting up the Twilio free trial (toll-free IVR + SMS)
+
+1. Create a free Twilio trial account (no card needed), verify your own phone number, and claim the free trial phone number.
+2. Start the tunnel (above) and, in the Twilio console, configure the number:
+   - **A call comes in** → Webhook → `POST https://<tunnel>/api/twilio/voice`
+   - **A message comes in** → Webhook → `POST https://<tunnel>/api/twilio/sms`
+3. `.env` (pick one of the SMS setups):
    ```ini
    TWILIO_ACCOUNT_SID=ACxxxxxxxx
    TWILIO_AUTH_TOKEN=xxxxxxxx          # also enables webhook signature validation
-   TWILIO_WEBHOOK_BASE_URL=https://<id>.ngrok-free.app
-   PUBLIC_WEB_URL=https://<id>.ngrok-free.app
+   TWILIO_FROM_NUMBER=+1XXXXXXXXXX     # the free trial number
 
-   # a) custom-text SMS from your Twilio number
+   # a) custom-text SMS from the trial number (works for countries that allow it on trial)
    SMS_PROVIDER=twilio
-   TWILIO_FROM_NUMBER=+1XXXXXXXXXX
    OTP_PROVIDER=local
 
    # b) template-only (works for Indian numbers on a trial)
@@ -200,21 +209,32 @@ Background notifications: while the app process is alive, new mail arrives insta
    # OTP_PROVIDER=twilio_verify
    # TWILIO_VERIFY_SERVICE_SID=VAxxxxxxxx
    ```
-5. `docker compose up -d` and call the number: *press 1*.
+4. `docker compose up -d` and call the number: *press 1*.
+
+**Testing the IVR without paying for an international call.** The trial number is a US number, so calling it from an Indian SIM costs ISD rates. Instead, let Twilio call you — receiving calls is free — and you hear the same menu:
+
+```bash
+scripts/twilio-call-me.sh +91XXXXXXXXXX     # your verified number
+```
 
 The IVR voice defaults to `Polly.Aditi` (`en-IN`); change it with `IVR_VOICE` / `IVR_LANGUAGE`.
 
-### Free custom SMS with SMSGate
+### Free custom SMS and free SMS sign-up with SMSGate
 
-1. Install **SMS Gateway for Android** (sms-gate.app) on a phone with a SIM and enable *Cloud server*; note the username/password it shows.
+1. Install **SMS Gateway for Android** ([sms-gate.app](https://sms-gate.app), free and open source) on an Android phone with a SIM, enable *Cloud server*, and note the username and password it shows. Under *Settings → Webhooks* copy the signing key.
 2. `.env`:
    ```ini
    SMS_PROVIDER=smsgate
+   OTP_PROVIDER=local
    SMSGATE_USERNAME=...
    SMSGATE_PASSWORD=...
-   OTP_PROVIDER=local
+   SMSGATE_SIGNING_KEY=...
    ```
-   (For the gateway's *local server* mode set `SMSGATE_URL=http://<phone-ip>:8080`.)
+3. `docker compose up -d`, start the tunnel, then register the incoming-SMS webhook:
+   ```bash
+   scripts/smsgate-webhook.sh
+   ```
+Now OTPs and new-mail alerts go out as normal SMS from that phone, and anyone who texts **JOIN** to the phone's ordinary (local) number gets an account and a reply with their address. Other texts to the phone are ignored. Webhooks are verified with the signing key (HMAC-SHA256).
 
 ## Configuration
 
@@ -229,11 +249,12 @@ All settings are environment variables read by `docker-compose.yml` (put them in
 | `WEB_PORT` / `PORTAL_PORT` / `SMTP_PORT` / `MAILPIT_PORT` | 8088 / 8089 / 2525 / 8025 | Host ports. |
 | `PUBLIC_WEB_URL` | `http://localhost:8088` | Used in SMS texts. |
 | `SMS_PROVIDER`, `OTP_PROVIDER` | `console`, `local` | See above. |
+| `SMSGATE_SIGNING_KEY` | — | Required to accept SMSGate incoming-SMS webhooks. |
 | `SMS_NOTIFY_MAX_PER_HOUR` | 10 | SMS alert cap per user. |
 | `SMTP_RELAY_URL` | `smtp://mailpit:1025` | Outbound relay for external recipients; empty disables external mail. |
 | `COOKIE_SECURE` | `false` | Set `true` behind HTTPS. |
 
-See [`.env.example`](.env.example) for everything (Twilio, SMSGate, Textbelt, Fast2SMS, IVR voice…).
+See [`.env.example`](.env.example) for everything (Twilio, SMSGate, IVR voice…).
 
 ## How conversations work
 
@@ -263,13 +284,14 @@ All endpoints are under `/api` (proxied by nginx). Web sessions use an `httpOnly
 | Lookup | `GET /lookup?q=`, `POST /contacts/match` |
 | Realtime | `GET /ws` (WebSocket: `entry.created`, `entries.updated`, `conversation.updated`, `drafts.updated`, `profile.updated`) |
 | Twilio | `POST /twilio/voice`, `POST /twilio/voice/menu`, `POST /twilio/sms` |
+| SMSGate | `POST /smsgate/webhook` (signed incoming-SMS webhook) |
 | Misc | `GET /config`, `GET /health`, `GET /dev/sms[/view]` (console provider only) |
 
 ## Security
 
 - OTP-only sign-in: HMAC-SHA256-hashed codes, single use, 5-minute expiry, 5 attempts, 30 s resend cooldown, per-number and per-IP hourly limits; only the newest code is valid.
 - Opaque 256-bit session tokens stored as SHA-256 hashes; revocable per device; `httpOnly` `SameSite=Lax` cookie + CSRF header for the web.
-- Twilio webhook signatures verified (HMAC-SHA1) when an auth token is configured.
+- Twilio webhook signatures verified (HMAC-SHA1) when an auth token is configured; SMSGate webhooks verified with HMAC-SHA256 and a 5-minute timestamp window.
 - SMTP: no open relay, unknown recipients rejected at `RCPT`, local-domain sender spoofing rejected, size limits.
 - Inbound HTML sanitised server-side (`sanitize-html`), rendered in a script-less sandboxed iframe (web) and a JavaScript-disabled WebView (Android); links open externally.
 - Attachments served through short-lived HMAC-signed URLs with `nosniff`, safe `Content-Disposition` and a restrictive CSP; uploads size-limited; avatars validated by magic bytes.
@@ -282,7 +304,7 @@ All endpoints are under `/api` (proxied by nginx). Web sessions use an `httpOnly
 ```bash
 # Backend (needs a Postgres; tests use TEST_DATABASE_URL, default postgres://test:test@localhost:55432/phonemail_test)
 docker run -d --name phonemail-testdb -e POSTGRES_USER=test -e POSTGRES_PASSWORD=test -e POSTGRES_DB=phonemail_test -p 55432:5432 postgres:16-alpine
-cd backend && npm ci && npm test          # 44 integration + unit tests
+cd backend && npm ci && npm test          # 48 integration + unit tests
 npm run dev                               # API on :3000 (DATABASE_URL=...)
 
 cd mailserver && go test ./...            # SMTP session + MIME parsing tests
@@ -302,12 +324,25 @@ web/         Web client (React, Vite) served by nginx
 portal/      Registration portal (static) served by nginx
 android/     Android app (Kotlin, Jetpack Compose)
 releases/    Built APK
-scripts/     send-test-email.py, simulate-twilio.sh
+scripts/     send-test-email.py, simulate-twilio.sh, tunnel-url.sh, twilio-call-me.sh, smsgate-webhook.sh
 ```
+
+## Everything is free
+
+| Piece | Free option |
+| --- | --- |
+| Hosting | `docker compose up -d` on your own machine |
+| Public HTTPS URL for webhooks | Cloudflare quick tunnel (`--profile tunnel`, no account) |
+| Toll-free number + IVR + SMS | Twilio free trial (trial credit; verified numbers only). Test the IVR with `scripts/twilio-call-me.sh` so you receive the call instead of paying for an international one. |
+| OTP and new-mail SMS | Dev outbox, Twilio trial (Verify template for India), or SMSGate on your own phone |
+| SMS sign-up with a local number | SMSGate (`JOIN`) |
+| Email between users and from other servers | Built-in SMTP server; mail to outside addresses is caught by Mailpit |
+| Android app | APK in `releases/` (no Play Store account needed) |
 
 ## Known limitations
 
 - Outbound delivery to the real internet needs an SMTP relay (`SMTP_RELAY_URL`) and a domain with SPF/DKIM; locally external mail is captured by Mailpit.
-- Twilio trial accounts only call/text verified numbers and prefix messages with a trial notice.
+- Twilio trial accounts only call/text verified numbers and prefix messages with a trial notice. The trial number is a US number: calling or texting it from India is charged by your mobile operator — use `twilio-call-me.sh` and SMSGate to stay free.
+- Delivering to real Gmail/Outlook inboxes or receiving from them needs a domain you own (with MX/SPF/DKIM records); `phonemail.com` is only used locally, as the brief's “SMTP (local)” intends.
 - Background notifications without Firebase are checked every 15 minutes when the app process is not running.
 - The APK is signed with a debug key; use your own keystore for store releases.
