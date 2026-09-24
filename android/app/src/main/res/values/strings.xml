@@ -44,7 +44,7 @@
     <string name="code_resent">A new code is on its way.</string>
     <string name="resend_sms">Resend SMS</string>
     <string name="verifying">Verifying…</string>
-    <string name="dev_outbox_hint">Developer mode: SMS are not really sent. Open %1$s on your computer to see the code.</string>
+    <string name="dev_outbox_hint">Everything runs locally: SMS are not really sent. Open the local phone at %1$s on your computer to see the code.</string>
     <string name="generic_error">Something went wrong. Please try again.</string>
     <string name="perm_contacts_title">Contacts and notifications</string>
     <string name="perm_contacts_body">To help you email friends and family, allow PhoneMail to access your contacts. PhoneMail also needs permission to notify you when new email arrives.</string>

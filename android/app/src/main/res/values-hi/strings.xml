@@ -41,7 +41,7 @@
     <string name="code_resent">नया कोड भेजा जा रहा है।</string>
     <string name="resend_sms">SMS फिर से भेजें</string>
     <string name="verifying">सत्यापित हो रहा है…</string>
-    <string name="dev_outbox_hint">डेवलपर मोड: SMS असल में नहीं भेजे जाते। कोड देखने के लिए अपने कंप्यूटर पर %1$s खोलें।</string>
+    <string name="dev_outbox_hint">सब कुछ आपके कंप्यूटर पर चलता है: SMS असल में नहीं भेजे जाते। कोड देखने के लिए अपने कंप्यूटर पर लोकल फ़ोन %1$s खोलें।</string>
     <string name="generic_error">कुछ गड़बड़ हुई। कृपया फिर से कोशिश करें।</string>
     <string name="perm_contacts_title">संपर्क और सूचनाएँ</string>
     <string name="perm_contacts_body">दोस्तों और परिवार को ईमेल करने में मदद के लिए PhoneMail को अपने संपर्कों तक पहुँच दें। नया ईमेल आने पर सूचना देने की अनुमति भी चाहिए।</string>

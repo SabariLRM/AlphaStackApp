@@ -224,7 +224,7 @@ fun OtpScreen(container: AppContainer, phone: String, onWrongNumber: () -> Unit,
             Box(
                 Modifier.padding(horizontal = 24.dp).background(Wa.colors.chip, RoundedCornerShape(10.dp)).border(1.dp, Wa.colors.divider, RoundedCornerShape(10.dp)).padding(12.dp),
             ) {
-                Text(stringResource(R.string.dev_outbox_hint, (container.client.baseUrl + "api/dev/sms/view").replace("//10.0.2.2", "//localhost")), color = Wa.colors.textSecondary, fontSize = 12.sp)
+                Text(stringResource(R.string.dev_outbox_hint, (container.client.baseUrl + "api/dev/phone").replace("//10.0.2.2", "//localhost")), color = Wa.colors.textSecondary, fontSize = 12.sp)
             }
         }
     }

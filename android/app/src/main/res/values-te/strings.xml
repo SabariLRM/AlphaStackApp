@@ -41,7 +41,7 @@
     <string name="code_resent">కొత్త కోడ్ పంపబడుతోంది.</string>
     <string name="resend_sms">SMS మళ్లీ పంపు</string>
     <string name="verifying">ధృవీకరిస్తోంది…</string>
-    <string name="dev_outbox_hint">డెవలపర్ మోడ్: SMS నిజంగా పంపబడవు. కోడ్ చూడటానికి మీ కంప్యూటర్‌లో %1$s తెరవండి.</string>
+    <string name="dev_outbox_hint">అంతా మీ కంప్యూటర్‌లోనే నడుస్తుంది: SMS నిజంగా పంపబడవు. కోడ్ చూడటానికి మీ కంప్యూటర్‌లో లోకల్ ఫోన్ %1$s తెరవండి.</string>
     <string name="generic_error">ఏదో తప్పు జరిగింది. దయచేసి మళ్లీ ప్రయత్నించండి.</string>
     <string name="perm_contacts_title">కాంటాక్ట్‌లు మరియు నోటిఫికేషన్‌లు</string>
     <string name="perm_contacts_body">స్నేహితులకు, కుటుంబానికి ఈమెయిల్ చేయడంలో సహాయపడటానికి, మీ కాంటాక్ట్‌లను యాక్సెస్ చేయడానికి PhoneMail కు అనుమతి ఇవ్వండి. కొత్త ఈమెయిల్ వచ్చినప్పుడు తెలియజేయడానికి కూడా అనుమతి అవసరం.</string>
